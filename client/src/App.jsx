@@ -1,8 +1,13 @@
-import React from "react";
-import Register from "./components/Register";
+import React, { useContext } from "react";
+import Form from "./components/Form";
+import axios from "axios";
+import { UserContext } from "./UserContext";
 
 const App = () => {
-  return <Register />;
+  axios.defaults.baseURL = "http://localhost:5000";
+  axios.defaults.withCredentials = true;
+
+  return <Form />;
 };
 
 export default App;
