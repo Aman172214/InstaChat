@@ -6,6 +6,7 @@ const cors = require("cors");
 const User = require("./models/User");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcryptjs");
+const ws = require("ws");
 
 dotenv.config();
 
@@ -85,6 +86,39 @@ app.post("/register", async (req, res) => {
   }
 });
 
-app.listen(5000, () => {
-  console.log("Serving to port 5000!");
+const port = process.env.PORT || 5000;
+
+const server = app.listen(port, () => {
+  console.log(`Serving to port ${port}!`);
+});
+
+const wss = new ws.WebSocketServer({ server });
+wss.on("connection", (connection, req) => {
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    const tokenString = cookies
+      .split(";")
+      .find((str) => str.startsWith("token="));
+    if (tokenString) {
+      const token = tokenString.split("=")[1];
+      if (token) {
+        jwt.verify(token, jwtSecret, {}, (error, data) => {
+          if (error) throw error;
+          const { username, userId } = data;
+          connection.userId = userId;
+          connection.username = username;
+        });
+      }
+    }
+  }
+  [...wss.clients].forEach((client) => {
+    client.send(
+      JSON.stringify({
+        online: [...wss.clients].map((client) => ({
+          userId: client.userId,
+          username: client.username,
+        })),
+      })
+    );
+  });
 });
