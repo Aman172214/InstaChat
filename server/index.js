@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const User = require("./models/User");
+const Message = require("./models/Message");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcryptjs");
 const ws = require("ws");
@@ -94,6 +95,7 @@ const server = app.listen(port, () => {
 
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (connection, req) => {
+  // read username and id from cookies for this connection
   const cookies = req.headers.cookie;
   if (cookies) {
     const tokenString = cookies
@@ -111,6 +113,8 @@ wss.on("connection", (connection, req) => {
       }
     }
   }
+
+  // notify about online people
   [...wss.clients].forEach((client) => {
     client.send(
       JSON.stringify({
@@ -120,5 +124,30 @@ wss.on("connection", (connection, req) => {
         })),
       })
     );
+  });
+
+  // sending messages
+  connection.on("message", async (message) => {
+    const messageData = JSON.parse(message.toString());
+    const { receiverId, text } = messageData;
+    if (receiverId && text) {
+      const messageDoc = await Message.create({
+        sender: connection.userId,
+        receiver: receiverId,
+        text: text,
+      });
+      [...wss.clients]
+        .filter((client) => client.userId === receiverId)
+        .forEach((client) =>
+          client.send(
+            JSON.stringify({
+              text,
+              sender: connection.userId,
+              receiver: receiverId,
+              id: messageDoc._id,
+            })
+          )
+        );
+    }
   });
 });
