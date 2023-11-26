@@ -1,21 +1,33 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import Avatar from "./Avatar";
 import { UserContext } from "../UserContext";
 import { uniqBy } from "lodash";
+import axios from "axios";
 
 const Chat = () => {
   const [ws, setWs] = useState(null);
   const [onlinePeople, setOnlinePeople] = useState({});
   const [selectedPerson, setSelectedPerson] = useState(null);
-  const [sentMessage, setSentMessage] = useState('');
+  const [sentMessage, setSentMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const { loggedInUsername, id } = useContext(UserContext);
+  const scrollToEnd = useRef();
 
   useEffect(() => {
+   connectToWS();
+  }, []);
+
+  const connectToWS = () =>{
     const ws = new WebSocket("ws://localhost:5000");
     setWs(ws);
     ws.addEventListener("message", serverMessageHandler);
-  }, []);
+    ws.addEventListener('close',()=>{
+      setTimeout(() => {
+        console.log('Trying to reconnect!')
+        connectToWS();
+      }, 1000);
+    })
+  }
 
   const showOnlinePeople = (peopleArray) => {
     const people = {};
@@ -45,14 +57,32 @@ const Chat = () => {
     setSentMessage(" ");
     setMessages((prevMessage) => [
       ...prevMessage,
-      { text: sentMessage, sender: id, receiver: selectedPerson },
+      {
+        text: sentMessage,
+        sender: id,
+        receiver: selectedPerson,
+        _id: Date.now(),
+      },
     ]);
   };
+
+  useEffect(() => {
+    const div = scrollToEnd.current;
+    if (div) div.scrollIntoView({ behaviour: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (selectedPerson) {
+      axios.get(`/messages/${selectedPerson}`).then(response=>{
+        setMessages(response.data)
+      });
+    }
+  }, [selectedPerson]);
 
   const onlinePeopleExcLoggedInUser = { ...onlinePeople };
   delete onlinePeopleExcLoggedInUser[id];
 
-  const uniqueMessageData = uniqBy(messages, "id");
+  const uniqueMessageData = uniqBy(messages, "_id");
 
   return (
     <div className="flex h-screen">
@@ -98,14 +128,33 @@ const Chat = () => {
         <div className="flex-grow">
           {!selectedPerson && (
             <div className="flex items-center justify-center h-full text-gray-400">
-              Select a person from sidebar
+              Select a conversation from sidebar
             </div>
           )}
           {!!selectedPerson && (
-            <div>
-              {uniqueMessageData.map((message) => (
-                <div key={Math.random()}>{message.text}</div>
-              ))}
+            <div className="relative h-full ">
+              <div className="absolute inset-0 overflow-y-auto mb-2 break-words">
+                {uniqueMessageData.map((message) => (
+                  <div
+                    key={message._id}
+                    className={
+                      message.sender === id ? "text-right" : "text-left"
+                    }
+                  >
+                    <div
+                      className={
+                        "px-2 my-1 inline-block rounded-md max-w-xs " +
+                        (message.sender === id
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white text-gray-800")
+                      }
+                    >
+                      {message.text}
+                    </div>
+                  </div>
+                ))}
+                <div ref={scrollToEnd}></div>
+              </div>
             </div>
           )}
         </div>
@@ -120,6 +169,7 @@ const Chat = () => {
             />
             <button
               type="submit"
+              disabled={sentMessage === " "}
               className="bg-indigo-600 p-2 text-white rounded-md font-semibold hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               <svg

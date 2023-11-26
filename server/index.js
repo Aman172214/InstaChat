@@ -39,6 +39,28 @@ app.get("/authenticate", async (req, res) => {
   }
 });
 
+const getOurUserId = async (req) => {
+  return new Promise((resolve, reject) => {
+    const token = req.cookies?.token;
+    if (token) {
+      jwt.verify(token, jwtSecret, {}, (error, data) => {
+        if (error) throw error;
+        resolve(data.userId);
+      });
+    } else reject("no token");
+  });
+};
+
+app.get("/messages/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const ourUserId = await getOurUserId(req);
+  const messages = await Message.find({
+    sender: { $in: [userId, ourUserId] },
+    receiver: { $in: [userId, ourUserId] },
+  }).sort({ createdAt: 1 });
+  res.json(messages);
+});
+
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const foundUser = await User.findOne({ username });
@@ -144,7 +166,7 @@ wss.on("connection", (connection, req) => {
               text,
               sender: connection.userId,
               receiver: receiverId,
-              id: messageDoc._id,
+              _id: messageDoc._id,
             })
           )
         );
