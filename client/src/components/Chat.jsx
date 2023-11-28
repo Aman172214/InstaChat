@@ -26,7 +26,9 @@ const Chat = () => {
     if ("online" in messageData) {
       showOnlinePeople(messageData.online);
     } else if ("text" in messageData) {
-      setMessages((prevMessage) => [...prevMessage, { ...messageData }]);
+      if (messageData.sender === selectedPerson) {
+        setMessages((prevMessage) => [...prevMessage, { ...messageData }]);
+      }
     }
   }, []);
 
@@ -54,30 +56,49 @@ const Chat = () => {
     setOnlinePeople(people);
   };
 
-  const sendMessageHandler = (event) => {
-    event.preventDefault();
+  const sendMessageHandler = (event, file) => {
+    if (event) event.preventDefault();
     ws.send(
       JSON.stringify({
         receiverId: selectedPerson,
         text: sentMessage,
+        file,
       })
     );
-    setSentMessage(" ");
-    setMessages((prevMessage) => [
-      ...prevMessage,
-      {
-        text: sentMessage,
-        sender: id,
-        receiver: selectedPerson,
-        _id: Date.now(),
-      },
-    ]);
+    if (file) {
+      axios.get(`/messages/${selectedPerson}`).then((response) => {
+        setMessages(response.data);
+      });
+    } else {
+      setSentMessage(" ");
+      setMessages((prevMessage) => [
+        ...prevMessage,
+        {
+          text: sentMessage,
+          sender: id,
+          receiver: selectedPerson,
+          _id: Date.now(),
+        },
+      ]);
+    }
+  };
+
+  const fileSendHandler = (event) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(event.target.files[0]);
+    reader.onload = () => {
+      sendMessageHandler(null, {
+        name: event.target.files[0].name,
+        data: reader.result,
+      });
+    };
   };
 
   const logoutHandler = () => {
     axios.post("/logout").then(() => {
       setId(null);
       setLoggedInUsername(null);
+      setWs(null);
     });
   };
 
@@ -116,7 +137,7 @@ const Chat = () => {
     <div className="flex h-screen">
       <div className=" bg-white w-1/4 py-3 flex flex-col">
         <div className="flex-grow">
-          <h1 className="text-indigo-600 font-bold text-3xl flex mb-5 pl-5">
+          <h1 className="text-indigo-600 font-bold text-3xl flex mb-5 justify-center">
             InstaChat
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -154,7 +175,24 @@ const Chat = () => {
             />
           ))}
         </div>
-        <div className="p-2 text-center">
+        <div className="p-2 text-center flex items-center justify-center">
+          <span className="flex m-2 text-gray-800 items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="1.5"
+              stroke="currentColor"
+              className="w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            {loggedInUsername}
+          </span>
           <button
             onClick={logoutHandler}
             className="bg-indigo-600  hover:bg-indigo-500 text-white rounded-md p-2"
@@ -189,6 +227,35 @@ const Chat = () => {
                       }
                     >
                       {message.text}
+                      {message.file && (
+                        <div className="flex items-center gap-1 underline underline-offset-2">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="1.5"
+                            stroke="currentColor"
+                            className="w-4 h-4"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"
+                            />
+                          </svg>
+                          <a
+                            href={
+                              axios.defaults.baseURL +
+                              "/uploads/" +
+                              message.file
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {message.file}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -206,10 +273,31 @@ const Chat = () => {
               className="bg-white flex-grow rounded-md p-1 border-0"
               onChange={(event) => setSentMessage(event.target.value)}
             />
+            <label className="bg-gray-300 rounded-md border border-gray-400 flex items-center cursor-pointer">
+              <input
+                type="file"
+                className="hidden"
+                onChange={fileSendHandler}
+              />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="1.5"
+                stroke="currentColor"
+                className="w-8 h-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"
+                />
+              </svg>
+            </label>
             <button
               type="submit"
               disabled={sentMessage === " "}
-              className="bg-indigo-600 p-2 text-white rounded-md font-semibold hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="bg-indigo-600 p-2 text-white rounded-md font-semibold hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 cursor-pointer"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

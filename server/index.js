@@ -8,6 +8,7 @@ const Message = require("./models/Message");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcryptjs");
 const ws = require("ws");
+const fs = require("fs");
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ const app = express();
 app.use(express.json());
 app.use(cors({ credentials: true, origin: process.env.CLIENT_URL }));
 app.use(cookieParser());
+app.use("/uploads", express.static(__dirname + "uploads"));
 
 mongoose
   .connect(process.env.MONGO_URL)
@@ -147,6 +149,7 @@ wss.on("connection", (connection, req) => {
     connection.ping();
     connection.endTimer = setTimeout(() => {
       connection.isAlive = false;
+      clearInterval(connection.timer);
       connection.terminate();
       notifyAboutOnlinePeople();
     }, 1000);
@@ -178,12 +181,24 @@ wss.on("connection", (connection, req) => {
   // sending messages
   connection.on("message", async (message) => {
     const messageData = JSON.parse(message.toString());
-    const { receiverId, text } = messageData;
-    if (receiverId && text) {
+    const { receiverId, text, file } = messageData;
+    let filename = null;
+    if (file) {
+      const parts = file.name.split(".");
+      const ext = parts[parts.length - 1];
+      filename = Date.now() + "." + ext;
+      const path = __dirname + "/uploads/" + filename;
+      const bufferData = Buffer.from(file.data.split(",")[1], "base64");
+      fs.writeFile(path, bufferData, () => {
+        console.log(path);
+      });
+    }
+    if (receiverId && (text || file)) {
       const messageDoc = await Message.create({
         sender: connection.userId,
         receiver: receiverId,
         text: text,
+        file: file ? filename : null,
       });
       [...wss.clients]
         .filter((client) => client.userId === receiverId)
@@ -194,6 +209,7 @@ wss.on("connection", (connection, req) => {
               sender: connection.userId,
               receiver: receiverId,
               _id: messageDoc._id,
+              file: file ? filename : null,
             })
           )
         );
