@@ -1,6 +1,6 @@
 import React from "react";
 
-const Avatar = ({ username, userId }) => {
+const Avatar = ({ username, userId, online }) => {
   const colors = [
     "bg-blue-200",
     "bg-red-200",
@@ -23,8 +23,14 @@ const Avatar = ({ username, userId }) => {
   const avatar = username[0].toUpperCase();
 
   return (
-    <div className={"w-8 h-8 rounded-full flex items-center " + color}>
-      <span className="text-center w-full">{avatar}</span>
+    <div className={"w-8 h-8 rounded-full relative flex items-center " + color}>
+      <span className="text-center w-full opacity-70">{avatar}</span>
+      {online && (
+        <div className="absolute w-3 h-3 bg-green-500 rounded-full bottom-0 right-0 border border-white"></div>
+      )}
+      {!online && (
+        <div className="absolute w-3 h-3 bg-gray-500 rounded-full bottom-0 right-0 border border-white"></div>
+      )}
     </div>
   );
 };

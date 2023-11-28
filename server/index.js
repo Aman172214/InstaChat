@@ -61,6 +61,11 @@ app.get("/messages/:userId", async (req, res) => {
   res.json(messages);
 });
 
+app.get("/people", async (req, res) => {
+  const users = await User.find({});
+  res.json(users);
+});
+
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const foundUser = await User.findOne({ username });
@@ -109,6 +114,10 @@ app.post("/register", async (req, res) => {
   }
 });
 
+app.post("/logout", (req, res) => {
+  res.cookie("token", "").json("ok");
+});
+
 const port = process.env.PORT || 5000;
 
 const server = app.listen(port, () => {
@@ -116,7 +125,37 @@ const server = app.listen(port, () => {
 });
 
 const wss = new ws.WebSocketServer({ server });
+
 wss.on("connection", (connection, req) => {
+  // notify about online people (when someone connects)
+  const notifyAboutOnlinePeople = () => {
+    [...wss.clients].forEach((client) => {
+      client.send(
+        JSON.stringify({
+          online: [...wss.clients].map((client) => ({
+            userId: client.userId,
+            username: client.username,
+          })),
+        })
+      );
+    });
+  };
+
+  connection.isAlive = true;
+
+  connection.timer = setInterval(() => {
+    connection.ping();
+    connection.endTimer = setTimeout(() => {
+      connection.isAlive = false;
+      connection.terminate();
+      notifyAboutOnlinePeople();
+    }, 1000);
+  }, 5000);
+
+  connection.on("pong", () => {
+    clearTimeout(connection.endTimer);
+  });
+
   // read username and id from cookies for this connection
   const cookies = req.headers.cookie;
   if (cookies) {
@@ -135,18 +174,6 @@ wss.on("connection", (connection, req) => {
       }
     }
   }
-
-  // notify about online people
-  [...wss.clients].forEach((client) => {
-    client.send(
-      JSON.stringify({
-        online: [...wss.clients].map((client) => ({
-          userId: client.userId,
-          username: client.username,
-        })),
-      })
-    );
-  });
 
   // sending messages
   connection.on("message", async (message) => {
@@ -172,4 +199,6 @@ wss.on("connection", (connection, req) => {
         );
     }
   });
+
+  notifyAboutOnlinePeople();
 });

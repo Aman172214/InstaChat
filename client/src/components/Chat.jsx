@@ -1,33 +1,50 @@
-import React, { useContext, useEffect, useState, useRef } from "react";
-import Avatar from "./Avatar";
+import React, {
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
 import { UserContext } from "../UserContext";
 import { uniqBy } from "lodash";
 import axios from "axios";
+import Person from "./Person";
 
 const Chat = () => {
   const [ws, setWs] = useState(null);
   const [onlinePeople, setOnlinePeople] = useState({});
+  const [offlinePeople, setOfflinePeople] = useState({});
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [sentMessage, setSentMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const { loggedInUsername, id } = useContext(UserContext);
+  const { loggedInUsername, id, setId, setLoggedInUsername } =
+    useContext(UserContext);
   const scrollToEnd = useRef();
 
-  useEffect(() => {
-   connectToWS();
+  const serverMessageHandler = useCallback((event) => {
+    const messageData = JSON.parse(event.data);
+    if ("online" in messageData) {
+      showOnlinePeople(messageData.online);
+    } else if ("text" in messageData) {
+      setMessages((prevMessage) => [...prevMessage, { ...messageData }]);
+    }
   }, []);
 
-  const connectToWS = () =>{
+  const connectToWS = useCallback(() => {
     const ws = new WebSocket("ws://localhost:5000");
     setWs(ws);
     ws.addEventListener("message", serverMessageHandler);
-    ws.addEventListener('close',()=>{
+    ws.addEventListener("close", () => {
       setTimeout(() => {
-        console.log('Trying to reconnect!')
+        console.log("Trying to reconnect!");
         connectToWS();
       }, 1000);
-    })
-  }
+    });
+  }, [serverMessageHandler]);
+
+  useEffect(() => {
+    connectToWS();
+  }, [connectToWS]);
 
   const showOnlinePeople = (peopleArray) => {
     const people = {};
@@ -35,15 +52,6 @@ const Chat = () => {
       people[userId] = username;
     });
     setOnlinePeople(people);
-  };
-
-  const serverMessageHandler = (event) => {
-    const messageData = JSON.parse(event.data);
-    if ("online" in messageData) {
-      showOnlinePeople(messageData.online);
-    } else if ("text" in messageData) {
-      setMessages((prevMessage) => [...prevMessage, { ...messageData }]);
-    }
   };
 
   const sendMessageHandler = (event) => {
@@ -66,6 +74,13 @@ const Chat = () => {
     ]);
   };
 
+  const logoutHandler = () => {
+    axios.post("/logout").then(() => {
+      setId(null);
+      setLoggedInUsername(null);
+    });
+  };
+
   useEffect(() => {
     const div = scrollToEnd.current;
     if (div) div.scrollIntoView({ behaviour: "smooth" });
@@ -73,56 +88,80 @@ const Chat = () => {
 
   useEffect(() => {
     if (selectedPerson) {
-      axios.get(`/messages/${selectedPerson}`).then(response=>{
-        setMessages(response.data)
+      axios.get(`/messages/${selectedPerson}`).then((response) => {
+        setMessages(response.data);
       });
     }
   }, [selectedPerson]);
 
-  const onlinePeopleExcLoggedInUser = { ...onlinePeople };
-  delete onlinePeopleExcLoggedInUser[id];
+  useEffect(() => {
+    axios.get("/people").then((response) => {
+      const offlinePeopleArr = response.data
+        .filter((person) => person._id !== id)
+        .filter((person) => !Object.keys(onlinePeople).includes(person._id));
+      const offlinePeople = {};
+      offlinePeopleArr.forEach(
+        (person) => (offlinePeople[person._id] = person)
+      );
+      setOfflinePeople(offlinePeople);
+    });
+  }, [onlinePeople, id]);
+
+  const onlinePeopleExcOurUser = { ...onlinePeople };
+  delete onlinePeopleExcOurUser[id];
 
   const uniqueMessageData = uniqBy(messages, "_id");
 
   return (
     <div className="flex h-screen">
-      <div className="bg-white w-1/4 py-3">
-        <h1 className="text-indigo-600 font-bold text-3xl flex mb-5 pl-5">
-          InstaChat
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="1.5"
-            stroke="currentColor"
-            className="w-7 h-7"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+      <div className=" bg-white w-1/4 py-3 flex flex-col">
+        <div className="flex-grow">
+          <h1 className="text-indigo-600 font-bold text-3xl flex mb-5 pl-5">
+            InstaChat
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="1.5"
+              stroke="currentColor"
+              className="w-7 h-7"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+              />
+            </svg>
+          </h1>
+          {Object.keys(onlinePeopleExcOurUser).map((userId) => (
+            <Person
+              key={userId}
+              userId={userId}
+              online={true}
+              onClick={() => setSelectedPerson(userId)}
+              selected={userId === selectedPerson}
+              username={onlinePeopleExcOurUser[userId]}
             />
-          </svg>
-        </h1>
-        {Object.keys(onlinePeopleExcLoggedInUser).map((userId) => (
-          <div
-            className={
-              "border-b border-gray-100  flex items-center gap-2 text-lg cursor-pointer " +
-              (selectedPerson ? "bg-indigo-50" : "")
-            }
-            key={userId}
-            onClick={() => setSelectedPerson(userId)}
+          ))}
+          {Object.keys(offlinePeople).map((userId) => (
+            <Person
+              key={userId}
+              userId={userId}
+              online={false}
+              onClick={() => setSelectedPerson(userId)}
+              selected={userId === selectedPerson}
+              username={offlinePeople[userId].username}
+            />
+          ))}
+        </div>
+        <div className="p-2 text-center">
+          <button
+            onClick={logoutHandler}
+            className="bg-indigo-600  hover:bg-indigo-500 text-white rounded-md p-2"
           >
-            {userId === selectedPerson && (
-              <div className="w-1 h-14 rounded-r-md bg-indigo-600"></div>
-            )}
-            <div className="flex gap-2 py-3 pl-5">
-              {" "}
-              <Avatar username={onlinePeople[userId]} userId={userId} />
-              <span>{onlinePeople[userId]}</span>
-            </div>
-          </div>
-        ))}
+            logout
+          </button>
+        </div>
       </div>
       <div className="flex flex-col bg-indigo-100 w-3/4 p-2">
         <div className="flex-grow">
