@@ -112,7 +112,7 @@ app.post("/register", async (req, res) => {
     });
   } catch (err) {
     if (err) throw err;
-    res.status(500).json("error");
+    res.status(500).json(err);
   }
 });
 
@@ -189,9 +189,7 @@ wss.on("connection", (connection, req) => {
       filename = Date.now() + "." + ext;
       const path = __dirname + "/uploads/" + filename;
       const bufferData = Buffer.from(file.data.split(",")[1], "base64");
-      fs.writeFile(path, bufferData, () => {
-        console.log(path);
-      });
+      fs.writeFile(path, bufferData, () => {});
     }
     if (receiverId && (text || file)) {
       const messageDoc = await Message.create({

@@ -5,7 +5,7 @@ import { UserContext } from "../UserContext";
 const Form = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [formType, setFormType] = useState("register");
+  const [formType, setFormType] = useState("login");
   const { setLoggedInUsername, setId } = useContext(UserContext);
 
   const usernameHandler = (event) => {
@@ -69,14 +69,12 @@ const Form = () => {
             </div>
 
             <div>
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium leading-6 text-gray-900"
-                >
-                  Password
-                </label>
-              </div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium leading-6 text-gray-900"
+              >
+                Password
+              </label>
               <div className="mt-2">
                 <input
                   id="password"

@@ -33,7 +33,7 @@ const Chat = () => {
   }, []);
 
   const connectToWS = useCallback(() => {
-    const ws = new WebSocket("ws://localhost:5000");
+    const ws = new WebSocket(import.meta.env.VITE_WEBSOCKET_URL);
     setWs(ws);
     ws.addEventListener("message", serverMessageHandler);
     ws.addEventListener("close", () => {
