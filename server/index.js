@@ -16,7 +16,7 @@ const jwtSecret = process.env.JWT_SECRET;
 
 const app = express();
 app.use(express.json());
-app.use(cors({ credentials: true, origin: process.env.CLIENT_URL }));
+app.use(cors());
 app.use(cookieParser());
 app.use("/uploads", express.static(__dirname + "uploads"));
 
@@ -120,7 +120,7 @@ app.post("/logout", (req, res) => {
   res.cookie("token", "").json("ok");
 });
 
-const port = process.env.PORT || 5000;
+const port = 5000;
 
 const server = app.listen(port, () => {
   console.log(`Serving to port ${port}!`);
