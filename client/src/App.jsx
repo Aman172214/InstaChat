@@ -5,7 +5,7 @@ import { UserContext } from "./UserContext";
 import Chat from "./components/Chat";
 
 const App = () => {
-  axios.defaults.baseURL = "https://insta-chat-api.vercel.app/";
+  axios.defaults.baseURL = "https://insta-chat-api.vercel.app";
   axios.defaults.withCredentials = true;
 
   const { loggedInUsername } = useContext(UserContext);
