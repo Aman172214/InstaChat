@@ -2,23 +2,28 @@ const express = require("express");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
-const cors = require("cors");
 const User = require("./models/User");
 const Message = require("./models/Message");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcryptjs");
 const ws = require("ws");
 const fs = require("fs");
+const cors = require("cors");
 
 dotenv.config();
 
 const jwtSecret = process.env.JWT_SECRET;
 
 const app = express();
+app.use("/uploads", express.static(__dirname + "/uploads"));
 app.use(express.json());
-app.use(cors());
 app.use(cookieParser());
-app.use("/uploads", express.static(__dirname + "uploads"));
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 
 mongoose
   .connect(process.env.MONGO_URL)
@@ -120,7 +125,7 @@ app.post("/logout", (req, res) => {
   res.cookie("token", "").json("ok");
 });
 
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 const server = app.listen(port, () => {
   console.log(`Serving to port ${port}!`);
